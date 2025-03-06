@@ -1,0 +1,18 @@
+Package: smartSim
+Type: Package
+Title: Smart-seq3 read simulator
+Version: 0.0.1
+Author: Marie Van Hecke
+Maintainer: Marie Van Hecke <mhecke.vanhecke@ugent.be>
+Description: simulation of Smart-seq3 data
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.2
+Imports: 
+	ShortRead,
+	reticulate,
+	dplyr,
+	Biostrings, 
+	IRanges,
+	rtracklayer,
+	R.utils

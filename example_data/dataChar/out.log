@@ -1,0 +1,27 @@
+### getting bias from Smart-Seq3 experiment ###
+git commit: 8d025b7701df2a879ef4f8b1f74aa5a2b104048e
+scripts/characterizeData.py --bamDir example_data/aligned --nBam 10 --numReads 10000 --gtf example_data/chr1.gtf --fasta example_data/chr1.fa --out example_data/dataChar --nCPU 4 --seed 1234 --stage geneFilt --phred 33
+###############################################
+getting standard genes
+getting non-overlapping genes
+Total number of genes:  5416
+Number of genes that are completely contained within another gene:  686
+Number of genes that were removed because they still show overlap with another gene:  92
+In total, we removed  778 genes
+getting non-overlapping genes
+1077  out of  4638  genes show overlap with a gene on the complementary strand
+getting genes with only 1 transcript
+Number of non-overlapping genes with only 1 transcript:  2130
+getting GC content of genes
+reading bam files
+reading bam file: example_data/aligned/TTGGAACCGAACCTGT.bam
+reading bam file: example_data/aligned/TCCAAGTCCAGATTCG.bam
+reading bam file: example_data/aligned/TACCGATGGGAGTAAC.bam
+reading bam file: example_data/aligned/TCCAAGTCGAGAAGGA.bam
+reading bam file: example_data/aligned/GGAGAGTTGAACCTGT.bam
+reading bam file: example_data/aligned/TGACCAAGCGATACTG.bam
+reading bam file: example_data/aligned/CAACCTCAGGCGTTAA.bam
+reading bam file: example_data/aligned/GCATGTCTCCACATAG.bam
+reading bam file: example_data/aligned/GGTCTCAACCATCCAA.bam
+reading bam file: example_data/aligned/TGACCAAGCCAATCCT.bam
+

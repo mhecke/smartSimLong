@@ -1,0 +1,10 @@
+name: smartSim
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - htseq=2.0.5
+  - scikit-learn=1.6.1
+  - statsmodels=0.14.4
+  - gitpython=3.1.44
