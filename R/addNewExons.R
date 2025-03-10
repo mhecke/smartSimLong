@@ -26,7 +26,7 @@ addNewExonSingleGene <- function(existingTranscripts, ref_seq, canonical){
   geneStart <- existingTranscripts[existingTranscripts$type == "gene", "start"]
   geneEnd <- existingTranscripts[existingTranscripts$type == "gene", "end"]
   gene_seq <- subseq(ref_seq, start = geneStart, end = geneEnd)
-
+  
   if (strand == "+"){
     leftBorder = "AG" #acceptor
     rightBorder = "GT" #donor
@@ -156,6 +156,14 @@ addNewExons <- function(annot_gtf, gene_ids, fasta, canonical = TRUE, seed = 123
 
   #get ref fasta
   ref_seq = readDNAStringSet(fasta)
+  
+  #in case fasta file contains space separated chromosome names and chromosome numbers
+  ref_seq_names = as.data.frame(do.call(rbind, strsplit(names(ref_seq), split = " ")))
+  selectCol <- apply(ref_seq_names, 2, function(col) all(unique(annot_gtf$seqnames) %in% col))
+  if (! any(selectCol)){
+    stop("fasta file does not contain all chromosomes in gtf.")
+  }
+  names(ref_seq) <- ref_seq_names[,selectCol]
 
   #reset rownames
   rownames(annot_gtf) <- 1:nrow(annot_gtf)
