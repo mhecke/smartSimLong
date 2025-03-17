@@ -36,7 +36,7 @@ DataCharacteristics <- function(inDir){
                            plot = FALSE)
 
   #fragment length for UMI-containing reads
-  fragLen_UMI[order(fragLen_UMI$val), ]
+  fragLen_UMI <- fragLen_UMI[order(fragLen_UMI$val), ]
   fragLen_UMI$cumSum <- cumsum(fragLen_UMI$count)
   tot <- fragLen_UMI$cumSum[nrow(fragLen_UMI)]
   fragLen_UMI <- fragLen_UMI[fragLen_UMI$cumSum >= 0.01*tot, ] #q01
@@ -44,7 +44,7 @@ DataCharacteristics <- function(inDir){
   fragLen_UMI_hist <- list("mids" = fragLen_UMI$val, "counts" = fragLen_UMI$count)
 
   #fragment length for non UMI-containing reads
-  fragLen_nonUMI[order(fragLen_nonUMI$val), ]
+  fragLen_nonUMI <- fragLen_nonUMI[order(fragLen_nonUMI$val), ]
   fragLen_nonUMI$cumSum <- cumsum(fragLen_nonUMI$count)
   tot <- fragLen_nonUMI$cumSum[nrow(fragLen_nonUMI)]
   fragLen_nonUMI <- fragLen_nonUMI[fragLen_nonUMI$cumSum >= 0.01*tot, ] #q01
