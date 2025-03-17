@@ -14,8 +14,8 @@ DataCharacteristics <- function(inDir){
   fragLen <- read.table(paste0(inDir, "/", "fragmentLength.tsv"), sep = "\t", header= TRUE)
   fragLen_UMI <- read.table(paste0(inDir, "/", "fragmentLength_UMI.tsv"), sep = "\t", header = TRUE)
   fragLen_nonUMI <- read.table(paste0(inDir, "/", "fragmentLength_nonUMI.tsv"), sep = "\t", header = TRUE)
-  readQual <- read.table(paste0(inDir, "/", "readQual.tsv"), sep = "\t", header = TRUE, comment.char="")
-  bcQual <- read.table(paste0(inDir, "/", "readQual.tsv"), sep = "\t", header = TRUE, comment.char="")
+  readQual <- read.table(paste0(inDir, "/", "readQual.tsv"), sep = "\t", header = TRUE, comment.char="", quote = NULL)
+  bcQual <- read.table(paste0(inDir, "/", "readQual.tsv"), sep = "\t", header = TRUE, comment.char="", quote = NULL)
 
   # number of unique UMIs per gene
   UMIsPerGene <- UMIcounts[UMIcounts$UMI != "noUMI",] %>%
