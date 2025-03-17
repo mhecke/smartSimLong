@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import numpy as np
 import statsmodels.api as sm
+import csv
 #import git
 
 lowess = sm.nonparametric.lowess
@@ -541,7 +542,7 @@ def boxplotStats(df):
 
 def plotQual(inFile, outFile, phred):
     #read data
-    readQual = pd.read_csv(inFile, sep = '\t')
+    readQual = pd.read_csv(inFile, sep = '\t', quoting=csv.QUOTE_NONE)
     readQual["qual"] = readQual["qual"].apply(ord) - phred
     readQual["pos"] += 1
     maxQual = max(readQual["qual"])
