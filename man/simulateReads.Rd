@@ -15,6 +15,8 @@ simulateReads(
   tag = "ATTGCGCAATG",
   PAF = 2,
   errorRate = 0.005,
+  long = FALSE,
+  longErrorRate = 0.05,
   seed = 1234
 )
 }
@@ -38,6 +40,10 @@ simulateReads(
 \item{PAF}{PCR amplification factor [default = 2]}
 
 \item{errorRate}{errorRate per bp [default = 0.005]}
+
+\item{long}{also generate long reads [default = long]}
+
+\item{longErrorRate}{error rate for long reads [default = 0.05]}
 
 \item{seed}{for reporducibility [default = 1234]}
 }

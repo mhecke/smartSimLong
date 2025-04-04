@@ -44,6 +44,8 @@ generateRandomSeq <- function(len){
 #' @param tag tag to indicate UMI containing read [default = "ATTGCGCAATG"]
 #' @param PAF PCR amplification factor [default = 2]
 #' @param errorRate errorRate per bp [default = 0.005]
+#' @param long also generate long reads [default = long]
+#' @param longErrorRate error rate for long reads [default = 0.05]
 #' @param seed for reporducibility [default = 1234]
 #'
 #' @importFrom Biostrings subseq width replaceLetterAt BStringSet
@@ -51,7 +53,7 @@ generateRandomSeq <- function(len){
 #' @export
 simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, barcodeLen = 8,
                           UMIlen = 10, readLen = 150, tag = "ATTGCGCAATG", PAF = 2, errorRate = 0.005,
-                          seed = 1234){
+                          long = FALSE, longErrorRate = 0.05, seed = 1234){
 
   print("simulating reads")
   dir.create(out, showWarnings = FALSE)
@@ -63,12 +65,17 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
   I1_all <- NULL; I2_all <- NULL
   R1_all <- NULL; R2_all <- NULL
   cell2barcode <- NULL
+  longBarcodes <- NULL
 
   #remove existing files if they exist
   if (file.exists(paste0(out, "/unassigned_R1.fq.gz"))) file.remove(paste0(out, "/unassigned_R1.fq.gz"))
   if (file.exists(paste0(out, "/unassigned_R2.fq.gz"))) file.remove(paste0(out, "/unassigned_R2.fq.gz"))
   if (file.exists(paste0(out, "/unassigned_I1.fq.gz"))) file.remove(paste0(out, "/unassigned_I1.fq.gz"))
   if (file.exists(paste0(out, "/unassigned_I2.fq.gz"))) file.remove(paste0(out, "/unassigned_I2.fq.gz"))
+  
+  if (long){
+    if (file.exists(paste0(out, "/long.fq.gz"))) file.remove(paste0(out, "/long.fq.gz"))
+  }
 
   #generate reads separately per cell
   for (cell in unique(transcriptExpression$cell)){
@@ -79,6 +86,7 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
     barcode_2 <- generateRandomSeq(barcodeLen)
     barcode <- paste0(barcode_1, barcode_2)
     cell2barcode <- rbind(cell2barcode, c(cell, barcode))
+    longBarcodes <- rbind(longBarcodes, barcode_2)
 
     cellExpression <- transcriptExpression[transcriptExpression$cell == cell,]
 
@@ -119,9 +127,6 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
     names(remainingSeq) <- NULL
     remainingSeq <- do.call(c, remainingSeq)
 
-    # nInternal <- round(sampleNonUMIvsUMI(dataChar, n = length(remainingSeq)))
-    # remainingSeq <- rep(remainingSeq, nInternal)
-
     internalFragLen <- sampleNonUMIfragLen(dataChar, n = length(remainingSeq), minLen = readLen)
     internalFragLen <- pmax(pmin(internalFragLen, width(remainingSeq)), readLen)
     validStarts <- width(remainingSeq) - internalFragLen + 1
@@ -149,18 +154,6 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
     names(I1) <- paste0(names(R1), " ", "1:N:0", barcode_1, "+", barcode_2)
     names(I2) <- paste0(names(R2), " ", "2:N:0", barcode_1, "+", barcode_2)
 
-    # if (is.null(I1_all)){
-    #   I1_all <- I1
-    #   R1_all <- R1
-    #   I2_all <- I2
-    #   R2_all <- R2
-    # }else{
-    #   I1_all <- c(I1_all, I1)
-    #   R1_all <- c(R1_all, R1)
-    #   I2_all <- c(I2_all, I2)
-    #   R2_all <- c(R2_all, R2)
-    # }
-
     # Write to FASTQ
     fastq_Q1 <- BStringSet(sampleReadQual(dataChar, readLen, length(R1)))
     fastq_Q2 <- BStringSet(sampleReadQual(dataChar, readLen, length(R2)))
@@ -170,7 +163,6 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
     writeFastq(fastq_R1, paste0(out, "/unassigned_R1.fq.gz"), compress = TRUE, mode = "a")
     writeFastq(fastq_R2, paste0(out, "/unassigned_R2.fq.gz"), compress = TRUE, mode = "a")
 
-    #qualities <- BStringSet(rep(paste0(rep("I", barcodeLen), collapse = ""), length(I1_all)))  # Phred quality scores (fake high quality)
     fastq_Q1 <- BStringSet(sampleBCQual(dataChar, barcodeLen, length(I1)))
     fastq_Q2 <- BStringSet(sampleBCQual(dataChar, barcodeLen, length(I1)))
     fastq_I1 <- ShortReadQ(sread = I1, quality = fastq_Q1, id = BStringSet(names(I1)))
@@ -179,6 +171,39 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
     writeFastq(fastq_I1, paste0(out, "/unassigned_I1.fq.gz"), compress = TRUE, mode = "a")
     writeFastq(fastq_I2, paste0(out, "/unassigned_I2.fq.gz"), compress = TRUE, mode = "a")
 
+    #generate long reads
+    if(long){
+      fwd_primer_libr = "AATGATACGGCGACCACCGAGATCTACAC"
+      fwd_primer = "TCGTCGGCAGCGTCAGATGTGTATA"
+      TSO = "AGAGACAG"
+      spacer = "AT"
+      
+      longExpr <- round(cellExpression$transcriptExpression * sampleLongVsShort(dataChar, length(cellExpression$transcriptExpression)))
+      
+      longUMIs <- replicate(sum(longExpr),
+                           generateRandomSeq(UMIlen))
+      longTranscripts <- rep(transcript_seq[cellExpression$transcript_id], longExpr)
+      taggedLongTranscripts <- DNAStringSet(paste0(fwd_primer_libr,barcode_2, fwd_primer, TSO, tag, longUMIs, spacer, "GGG", longTranscripts))
+      names(taggedLongTranscripts) <- names(longTranscripts)
+      
+      #number of reads per long UMI
+      nReadsLong = round(sampleNumLongReads(dataChar, length(taggedLongTranscripts)))
+      taggedLongTranscripts <- rep(taggedLongTranscripts, nReadsLong)
+      
+      #long read lengths
+      longReadLen <- round(sampleLongReadLen(dataChar, length(taggedLongTranscripts)) * width(taggedLongTranscripts))
+      longReads <- subseq(taggedLongTranscripts, start = 1, end = longReadLen)
+      names(longReads) <-  paste0(barcode, "_", names(longReads), ":read", seq(1, length(longReads)))
+      
+      # Write to FASTQ
+      fastq_Q <- BStringSet(sampleLongReadQual(dataChar, longReadLen))
+      fastq_R <- ShortReadQ(sread = longReads, quality = fastq_Q, id = BStringSet(names(longReads)))
+      
+      writeFastq(fastq_R, paste0(out, "/long.fq.gz"), compress = TRUE, mode = "a")
+      
+    }
+    
+    
   }
 
   cell2barcode <- as.data.frame(cell2barcode)
@@ -190,5 +215,12 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
   write.table(cell2barcode,
               paste0(out, "/cell2barcode.tsv"),
               sep = "\t", row.names = F, quote = F)
+  if (long){
+    write.table(longBarcodes, paste0(out, "/longBarcodes.txt"), 
+                row.names = F, col.names = F, quote = F)
+    
+    write.table(cbind(cell2barcode$barcode, longBarcodes), paste0(out, "/short2longBarcodes.txt"), 
+                row.names = F, col.names = F, quote = F)
+  }
 }
 

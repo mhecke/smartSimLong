@@ -5,10 +5,11 @@
 \title{characterizeData()}
 \usage{
 characterizeData(
-  bam,
+  shortBam,
   gtf,
   fasta,
   out,
+  longBam = NULL,
   nCPU = 4,
   numReads = NULL,
   nBam = NULL,
@@ -18,7 +19,7 @@ characterizeData(
 )
 }
 \arguments{
-\item{bam}{a single bam file, or a directory containing several bam files used to characterize data}
+\item{shortBam}{a single bam file, or a directory containing several short read bam files used to characterize data}
 
 \item{gtf}{gtfFile containing the reference annotation}
 
@@ -26,11 +27,13 @@ characterizeData(
 
 \item{out}{output directory}
 
+\item{longBam}{a single bam file, or a directory containing several long read bam files, used to characterize long read data (when available)}
+
 \item{nCPU}{number of parallel CPU processes [default = 4]}
 
-\item{numReads}{max number of reads in bam file to be used for data characterization, by default all reads are used}
+\item{numReads}{max number of reads in short bam file to be used for data characterization, by default all reads are used}
 
-\item{nBam}{number of bam files used for bias computation, only used if multiple bam files are used, by default all bam files are used}
+\item{nBam}{number of short bam files used for data characterization, only used if multiple bam files are used, by default all bam files are used}
 
 \item{seed}{random seed for reproducibility [default = 1234]}
 

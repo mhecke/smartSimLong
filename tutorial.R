@@ -1,11 +1,11 @@
 
 #set path to smartSim
-ssPath <- "path/to/smartSim"
+ssPath <- "~/Documents/smartSimLong" #TODO: change to path/to/smartSim
 
 #install from source
 install.packages(ssPath, repos = NULL, type="source")
 
-library(smartSim)
+library(smartSimLong)
 library(reticulate)
 library(R.utils)
 setwd(ssPath)
@@ -14,21 +14,22 @@ setwd(ssPath)
 use_condaenv("smartSim")
 
 #input data
-bamDir <- "example_data/aligned"
-gtfFile <- "example_data/chr1.gtf"
-fastaFile <- "example_data/chr1.fa"
+shortBam = "/home/bioit/mhecke/Documents/jurkat_241209/zUMIs/jurkat.filtered.Aligned.GeneTagged.sorted.bam"
+longBamDir = "/home/bioit/mhecke/Documents/jurkat_241209/UMI_tools/UMIs_longBarcodes"
+gtfFile <- "/home/bioit/mhecke/Documents/refGenomeNoReadThrough/noReadThrough.gtf"
+fastaFile <- "/home/bioit/mhecke/Documents/refGenomeNoReadThrough/GRCh38.primary_assembly.genome.fa"
 
 #output directories
-dataCharDir <- "example_data/dataChar"
-trueTranscriptDir <- "example_data/trueTranscripts"
-readDir <- "example_data/reads"
+dataCharDir <- "example_data_long/dataChar"
+trueTranscriptDir <- "example_data_long/trueTranscripts"
+readDir <- "example_data_long/reads"
 
 #parameters
 nClust = 2            #number of cell populations
 nCellsPerClust = 10   #number of cells per cell population
 nGenes = 10           #number of genes to simulate
 nTx = 2               #number of transcripts per gene
-barcodeLen = 8        #length of cell barcode
+barcodeLen = 10       #length of cell barcode
 UMIlen = 8            #length of UMI
 readLen = 150         #length of 1 end of PE read
 tag = "ATTGCGCAATG"   #Smart-seq3 tag used to identify UMI containing reads
@@ -44,17 +45,18 @@ if(! file.exists(gtfFile) & file.exists(paste0(gtfFile, ".gz"))){
 }
 
 #characterize existing dataset
-dataChar <- characterizeData(bamDir,
+dataChar <- characterizeData(shortBam,
                              gtfFile,
                              fastaFile,
                              dataCharDir,
+                             longBam = longBamDir,
                              nCPU = 4,
-                             numReads = 1000,
+                             numReads = 1000000,
                              seed = 1234,
                              stage = "geneFilt",
                              phred = 33)
 
-# this may take a few minutes.
+# this may take a while.
 # To save time you can also read in the datacharacteristics provided, by uncommenting the following line:
 #dataChar <- DataCharacteristics(dataCharDir)
 
@@ -121,6 +123,8 @@ simulateReads(transcriptExpression = transcriptExpression,
               tag = tag,
               PAF = 2,
               errorRate = 0.005,
+              long = TRUE,
+              longErrorRate = 0.05,
               seed = 1234)
 
 

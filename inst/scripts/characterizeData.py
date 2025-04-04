@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import numpy as np
 import statsmodels.api as sm
+import csv
 #import git
 
 lowess = sm.nonparametric.lowess
@@ -228,6 +229,8 @@ def readBams(exons, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, ge
     allReadQual = []
     allBcQual = []
     
+    allCells = set()
+    
     #statsLock = multiprocessing.Lock()
         
     print("reading bam files")
@@ -241,7 +244,7 @@ def readBams(exons, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, ge
         pool.join()
 
         #merge counts from different files
-        for fraglen, fragGeneLen, fragLen_UMI, fragLen_nonUMI, GC, GC_geneAvg, UMIcounts, readQual, bcQual in res:
+        for fraglen, fragGeneLen, fragLen_UMI, fragLen_nonUMI, GC, GC_geneAvg, UMIcounts, readQual, bcQual, cells in res:
             allFragLen.update(fraglen)
             allFragGeneLen.update(fragGeneLen)
             UMIFragLen.update(fragLen_UMI)
@@ -260,6 +263,8 @@ def readBams(exons, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, ge
                 allBcQual += [Counter() for _ in range(len(bcQual)-len(allBcQual))]
             for i, qualCtr in enumerate(bcQual):
                 allBcQual[i].update(qualCtr)
+                
+            allCells.update(cells)
 
     #write fragmentlength to file
     f = open(outDir + "/fragmentLength.tsv", "w")
@@ -318,6 +323,8 @@ def readBams(exons, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, ge
     for pos, qualCtr in enumerate(allBcQual):
         for q, count in qualCtr.items():
             f.write(str(pos)  +"\t" + q + "\t" + str(count) + "\n")
+            
+    return cells
 
 
     
@@ -338,6 +345,7 @@ def readSingleBam(file, exons, seqGC, geneSet, geneLen, numReads):
     
     readQual = []
     bcQual = []
+    cells = set()
 
     ctr = 0
     for r1,r2 in HTSeq.pair_SAM_alignments_with_buffer(bam_reader):
@@ -353,6 +361,7 @@ def readSingleBam(file, exons, seqGC, geneSet, geneLen, numReads):
         BC = r1.optional_field('BC')
         if BC == "":
             break
+        cells.add(BC)
         
         #limit number of reads used for data characterization
         if (numReads is not None) and (ctr > numReads):
@@ -446,7 +455,7 @@ def readSingleBam(file, exons, seqGC, geneSet, geneLen, numReads):
     for gene in GC_geneAvg:
         GC_geneAvg[gene] /= gene_counter[gene]
 
-    return fragLen_counter, fragGeneLen_counter, UMIFragLen_counter, nonUMIFragLen_counter, GC_counter, GC_geneAvg, UMIcounts, readQual, bcQual
+    return fragLen_counter, fragGeneLen_counter, UMIFragLen_counter, nonUMIFragLen_counter, GC_counter, GC_geneAvg, UMIcounts, readQual, bcQual, cells
 
 def assignSingleReadToGene(read, exons):
     iset = None
@@ -473,6 +482,138 @@ def assignToGene(read1, read2, exons):
         return None
     
     return (r1_genes.intersection(r2_genes))
+
+
+def readLongBams(exons, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, geneSet):
+
+    # total fragment length distr.
+    allFragLen = Counter()
+    
+    #UMI counts
+    allUMIcounts = Counter()
+    
+    #quality scores per position
+    allReadQual = []
+        
+    print("reading long bam files")
+    
+    #read bamfiles in parallel
+    nCPU = min(len(bamFiles), nCPU)
+    with multiprocessing.Pool(nCPU) as pool:
+        res = pool.imap(partial(readSingleLongBam, exons = exons, seqGC = seqGC, geneSet = geneSet, geneLen = geneLen, numReads = numReads), bamFiles)
+        pool.close()
+        pool.join()
+
+        #merge counts from different files
+        for fraglen, UMIcounts, readQual in res:
+            allFragLen.update(fraglen)
+            allUMIcounts.update(UMIcounts)
+            
+            if (len(allReadQual) < len(readQual)):
+                allReadQual += [Counter() for _ in range(len(readQual)-len(allReadQual))]
+            for i, qualCtr in enumerate(readQual):
+                allReadQual[i].update(qualCtr)
+    
+    #write fragmentlength to file
+    f = open(outDir + "/long_fragmentLength.tsv", "w")
+    f.write("val" + "\t" + "count" + "\n")
+    for val, count in allFragLen.items():
+        f.write(str(val) + "\t" + str(count) + "\n")
+    f.close()
+    
+    f = open(outDir + "/long_UMIcounts.tsv", "w")
+    f.write("cell"+ "\t"+ "gene"+ "\t"+ "UMI"+ "\t"+ "numReads"+ "\n")
+    for (BC, gene, UMI), count in allUMIcounts.items():
+        f.write(BC+ "\t" + gene + "\t" + UMI + "\t" + str(count) + "\n")
+    f.close()
+
+    f = open(outDir + "/long_readQual.tsv", "w")
+    f.write("pos" + "\t" + "qual" + "\t" + "count" + "\n")
+    for pos, qualCtr in enumerate(allReadQual):
+        for q, count in qualCtr.items():
+            f.write(str(pos)  +"\t" + q + "\t" + str(count) + "\n")
+
+def readSingleLongBam(file, exons, seqGC, geneSet, geneLen, numReads):
+
+    print("reading long bam file: " + file)
+
+    bam_reader = HTSeq.BAM_Reader(file)
+    
+    fragLen_counter = Counter()     #counts per fragment length in sample
+    UMIcounts = Counter()    
+    readQual = []
+
+    ctr = 0
+    for r1 in bam_reader:
+            
+        #skip non primary alignments
+        if (r1.not_primary_alignment):
+            continue
+        
+        #cell barcode
+        if not any('CB' == t[0] for t in r1.optional_fields):
+            continue
+        BC = r1.optional_field('CB')
+        if BC == "":
+            continue
+        
+        #limit number of reads used for data characterization
+        if (numReads is not None) and (ctr > numReads):
+            break
+        ctr += 1
+        
+        #UMI
+        UMI = r1.optional_field('BX')
+        if UMI == "":
+            UMI = "noUMI"
+        
+        try:
+            #assign to gene (get non-overlapping set of genes)
+            iset = assignSingleReadToGene(r1, exons)
+                        
+            #skip reads that don't map to a gene
+            if iset is None or len(iset) == 0: 
+                continue
+            
+            #only 1 gene assigned
+            gene = iset.pop()
+
+            #remove genes not in geneSet
+            if gene not in geneSet:
+                continue
+            
+            #get edges of fragment
+            minPos = r1.iv.start
+            maxPos = r1.iv.end
+            
+            #compute fragmentlength
+            fragment_iv = HTSeq.GenomicInterval(r1.iv.chrom, minPos, maxPos, ".")
+            fragment_length = 0
+            for iv, step_set in exons[fragment_iv].steps():
+                if gene in step_set:
+                    fragment_length += iv.length
+            
+            #keep fragment length
+            fragLen_counter[round(fragment_length/geneLen[gene], 2)] += 1
+            
+            #keep number of reads per UMI
+            UMIcounts[tuple((BC, gene, UMI))] += 1
+            
+            #keep quality per position for read
+            thisReadLen = len(r1.read)
+            if thisReadLen > len(readQual):
+                readQual += [Counter() for _ in range(thisReadLen - len(readQual))]
+            for i, q in enumerate(r1.read.qualstr.decode('utf-8')):
+                readQual[i][q] += 1
+             
+        except KeyError:
+            #chrom of read not in reference
+            pass
+
+    return fragLen_counter, UMIcounts, readQual
+
+
+
 
 def plotFragLen(inFile, outFile):
     #fragment length
@@ -541,7 +682,7 @@ def boxplotStats(df):
 
 def plotQual(inFile, outFile, phred):
     #read data
-    readQual = pd.read_csv(inFile, sep = '\t')
+    readQual = pd.read_csv(inFile, sep = '\t', quoting=csv.QUOTE_NONE)
     readQual["qual"] = readQual["qual"].apply(ord) - phred
     readQual["pos"] += 1
     maxQual = max(readQual["qual"])
@@ -741,6 +882,12 @@ def _parse_arguments():
         help="path/to/bamFile containing bam file")
     
     pa.add_argument(
+        "--longBamFile", 
+        dest="longBamFile",
+        type=str,
+        help="path/to/longBamFile containing bam file with long reads")
+    
+    pa.add_argument(
         "--numReads",
         dest="numReads",
         type=int,
@@ -750,7 +897,13 @@ def _parse_arguments():
         "--bamDir",
         dest="bamDir",
         type=str,
-        help="path/to/directory containing multiple STAR output bam files")
+        help="path/to/directory containing multiple STAR output bam files with short reads")
+    
+    pa.add_argument(
+        "--longBamDir",
+        dest="longBamDir",
+        type=str,
+        help="path/to/directory containing multiple STAR output bam files with long reads")
     
     pa.add_argument(
         "--nBam",
@@ -769,7 +922,7 @@ def _parse_arguments():
         dest="stage",
         type=str,
         default="geneFilt",
-        help="start at specific stage. options: geneFilt, readBams, plotStats [default = geneFilt]"
+        help="start at specific stage. options: geneFilt, readBams, rplotStats [default = geneFilt]"
     )
     
     pa.add_argument(
@@ -873,6 +1026,7 @@ def main():
     #read alignment files
     if (args.stage == 'readBams'):
         
+        #read short reads
         if (args.bamDir is not None):
             #read all bamfiles
             bamFiles = []
@@ -882,12 +1036,29 @@ def main():
             #select nBam random files
             if (args.nBam is not None):
                 bamFiles = random.sample(bamFiles, args.nBam)
-            
         else:
             bamFiles = [args.bamFile]
             
-        readBams(exons, seqGC, geneGC, geneLen, bamFiles, args.numReads, args.outDir, args.nCPU, uniqueTranscriptGenes)
+        cells = readBams(exons, seqGC, geneGC, geneLen, bamFiles, args.numReads, args.outDir, args.nCPU, uniqueTranscriptGenes)
+        
+        #read long reads
+        if (args.longBamDir is not None or args.longBamFile is not None):
+            if (args.longBamDir is not None):
+                #read all bamfiles
+                longBamFiles = []
+                for file in listdir(args.longBamDir):
+                    if re.search(".*\\.bam$", file):
+                        print(file)
+                        if any(cell in file for cell in cells):
+                            longBamFiles.append(args.longBamDir  +"/" + file)
+            else:
+                longBamFiles = [args.bamFile]
+        
+        readLongBams(exons, seqGC, geneGC, geneLen, longBamFiles, args.numReads, args.outDir, args.nCPU, uniqueTranscriptGenes)
+        
         args.stage = 'plotStats'
+            
+        
         
     #plot figures
     if (args.stage == 'plotStats'):

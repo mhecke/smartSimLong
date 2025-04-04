@@ -2,13 +2,14 @@
 #'
 #' @description characterize Smart-seq3 dataset
 #'
-#' @param bam a single bam file, or a directory containing several bam files used to characterize data
+#' @param shortBam a single bam file, or a directory containing several short read bam files used to characterize data
 #' @param gtf gtfFile containing the reference annotation
 #' @param fasta fastaFile containing the reference genome
 #' @param out output directory
+#' @param longBam a single bam file, or a directory containing several long read bam files, used to characterize long read data (when available)
 #' @param nCPU number of parallel CPU processes [default = 4]
-#' @param numReads max number of reads in bam file to be used for data characterization, by default all reads are used
-#' @param nBam number of bam files used for bias computation, only used if multiple bam files are used, by default all bam files are used
+#' @param numReads max number of reads in short bam file to be used for data characterization, by default all reads are used
+#' @param nBam number of short bam files used for data characterization, only used if multiple bam files are used, by default all bam files are used
 #' @param seed random seed for reproducibility [default = 1234]
 #' @param stage stage from where to start running: geneFilt, readBams, plotStats [default = geneFilt]
 #' @param phred phred encoding [default = 33]
@@ -16,7 +17,7 @@
 #' @return object of class "DataCharacteristics"
 #'
 #' @export
-characterizeData <- function(bam, gtf, fasta, out, nCPU = 4, numReads = NULL, nBam = NULL, seed = 1234, stage = "geneFilt", phred = 33) {
+characterizeData <- function(shortBam, gtf, fasta, out, longBam = NULL, nCPU = 4, numReads = NULL, nBam = NULL, seed = 1234, stage = "geneFilt", phred = 33) {
 
   #checks
   if (! stage %in% c("geneFilt", "readBams", "plotStats")){
@@ -52,20 +53,30 @@ characterizeData <- function(bam, gtf, fasta, out, nCPU = 4, numReads = NULL, nB
     dir.create(out, showWarnings = FALSE)
   }
 
-  if (! dir.exists(bam) & ! file.exists(bam)){
-    print("provide valid bam file/directory")
+  if (! dir.exists(shortBam) & ! file.exists(shortBam)){
+    print("provide valid shortBam file/directory")
     stop()
   }
 
   python_cmd <- system.file("scripts", "characterizeData.py", package = "smartSim")
 
-  if (dir.exists(bam)){
+  if (dir.exists(shortBam)){
     python_cmd = paste(python_cmd,
-                       "--bamDir", bam)
+                       "--bamDir", shortBam)
   } else{
     python_cmd = paste(python_cmd,
-                       "--bamFile", bam)
+                       "--bamFile", shortBam)
   }
+  if(! is.null(longBam)){
+    if (dir.exists(longBam)){
+      python_cmd = paste(python_cmd, 
+                         "--longBamDir", longBam)
+    } else{
+      python_cmd = paste(python_cmd, 
+                         "--longBamFile", longBam)
+    }
+  }
+  
   if (! is.null(nBam)){
     python_cmd = paste(python_cmd,
                        "--nBam", nBam)
